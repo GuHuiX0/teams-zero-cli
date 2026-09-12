@@ -1,0 +1,45 @@
+{
+  "sources": [
+    {
+      "url": "https://github.com/KamorionLabs/msteams-local-mcp",
+      "commit": "9103ba5b9c957c26ce9168b96f7e78094edf74e2",
+      "modifications": "CLI replaced; reader resource cleanup and malformed-message guards added."
+    },
+    {
+      "url": "https://github.com/cclgroupltd/ccl_chromium_reader",
+      "commit": "ef840de30221c4d65bc96d2f4d9057e9ef2f526d",
+      "modifications": "Selected IndexedDB dependencies only; package __init__ omits profile import."
+    },
+    {
+      "url": "https://github.com/cclgroupltd/ccl_simplesnappy",
+      "commit": "3d085230baa8c46cf2090ebba29bf6e8eab31087",
+      "modifications": "None"
+    }
+  ],
+  "files_sha256": {
+    "LICENSES/ccl-chromium-reader.txt": "8ce15e5de85acae9c6073520f85b822672bd9d756fd3b4051331b420e8279765",
+    "LICENSES/ccl-simplesnappy.txt": "4fe6b385b6dd8bfaca9dc92c258cf2eb5a9240ca5114cd8db2bbd26326f1b6cd",
+    "LICENSES/msteams-local-mcp.txt": "e7ea0c2814e894bd0dd09e46601ed26731ef81ed1450c782257ab403f3e5644a",
+    "msteams_local_cli/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "msteams_local_cli/cli.py": "bba3b090bf378e094fbd20c540637175b3ef03ef763b2a2aecac353dd2355367",
+    "msteams_local_cli/reader.py": "6d44fa92cd734daa4960e1669ba0118c5bcebe29d9475f1eb2b56f2973582365",
+    "README.md": "3f7a1ff8ed3dcddb777425df2fcd621b498ab5ce9fe23c7adbaa36df39d4e902",
+    "teams_cli.py": "010a70d923c9da600c8c2abad915c7008190a5534fb6aeffdac1c33e4b86b36d",
+    "test_cli.py": "bc48affc8a872d2a61ef2a02096c23df5555487a36e0c52ef3d240aa186089d9",
+    "upstream/cli.py": "8ae6e9696bb696ae3ed7dcc3ffd0865096e706aa973c4ac39a864eb24e177055",
+    "upstream/LICENSE": "e7ea0c2814e894bd0dd09e46601ed26731ef81ed1450c782257ab403f3e5644a",
+    "upstream/reader.py": "58718b67d9fb966c2e1c3c6fd167e51d650349aa1b7a7b1d83b6052d79674e68",
+    "vendor/ccl_chromium_reader/__init__.py": "e2699c3c32ebe756c254779156cfdf0b03f7fbf8891cf763159406ba064fd5b3",
+    "vendor/ccl_chromium_reader/ccl_chromium_indexeddb.py": "7f7ea45d013a03b76cbbbb64e98881cd859d55ec38c7ce17d271c0c84eb41faf",
+    "vendor/ccl_chromium_reader/common.py": "301879c70eb702f3e92a47f93f9bf2e4090a3c84bc9cf236d8cbcf6c05a858aa",
+    "vendor/ccl_chromium_reader/profile_folder_protocols.py": "be84b74e50da254bb34d7f060f69b765c36f86c9659b127830a6880a8bee88a4",
+    "vendor/ccl_chromium_reader/serialization_formats/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "vendor/ccl_chromium_reader/serialization_formats/ccl_blink_value_deserializer.py": "fc34c567241500f5cf85357e2c2ffb723f8d225a94aba08f1a00769769668706",
+    "vendor/ccl_chromium_reader/serialization_formats/ccl_v8_value_deserializer.py": "c4753c211c97d797dd40052d0902482bccd5642010d80399bfe48f60becac9a8",
+    "vendor/ccl_chromium_reader/storage_formats/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "vendor/ccl_chromium_reader/storage_formats/ccl_leveldb.py": "6b56729a8964c8dfec0b526ba805479de310ac91bbb493ba029c890f053e9155",
+    "vendor/ccl_chromium_reader/structures.py": "1670d69b9a2d79f2e8e71ea3fb6b9135b9702325b083d6f4f2eaf1525319d62c",
+    "vendor/ccl_simplesnappy/__init__.py": "3aa02b2b431f755976a0cc35330a5649859654b153f952c85a71175c2b1a709a",
+    "vendor/ccl_simplesnappy/ccl_simplesnappy.py": "7436f4fc0c3fdbc52674c17881ab90a05f57b633bd498f06697e08bd6fc287ae"
+  }
+}
