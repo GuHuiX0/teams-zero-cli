@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "account": "TENANT_ID:USER_ID",
+  "conversation_id": "CONVERSATION_ID_FROM_LIST",
+  "conversation_name": "Dev Team",
+  "state_path": "state/dev-team.json",
+  "output_path": "digests",
+  "log_path": "logs/monitor.log"
+}

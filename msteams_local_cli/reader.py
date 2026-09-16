@@ -23,7 +23,7 @@ from __future__ import annotations
 
 import dataclasses
 import glob
-import html
+from html.parser import HTMLParser
 import os
 import pathlib
 import re
@@ -35,10 +35,33 @@ from typing import Any, Optional
 
 from ccl_chromium_reader import ccl_chromium_indexeddb as _idb
 
-_TAG_RE = re.compile(r"<[^>]+>")
+class _MessageHTMLParser(HTMLParser):
+    _blocks = {'p', 'div', 'li', 'ul', 'ol', 'blockquote', 'pre', 'tr',
+               'h1', 'h2', 'h3', 'h4', 'h5', 'h6'}
+
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.parts = []
+
+    def _boundary(self):
+        if self.parts and not self.parts[-1].endswith('\n'):
+            self.parts.append('\n')
+
+    def handle_starttag(self, tag, attrs):
+        if tag == 'br':
+            self.parts.append('\n')
+        elif tag in self._blocks:
+            self._boundary()
+
+    def handle_endtag(self, tag):
+        if tag in self._blocks:
+            self._boundary()
+
+    def handle_data(self, data):
+        self.parts.append(data)
 
 
-def _text(value: Any) -> str:
+def _text(value: Any, content_type: str = '') -> str:
     """Best-effort plain text from an HTML/str/bytes message body."""
     if value is None:
         return ""
@@ -46,7 +69,12 @@ def _text(value: Any) -> str:
         value = value.decode("utf-8", "replace")
     if not isinstance(value, str):
         value = str(value)
-    return _TAG_RE.sub("", html.unescape(value)).strip()
+    if str(content_type).lower() in {'text', 'text/plain'}:
+        return value.strip()
+    parser = _MessageHTMLParser()
+    parser.feed(value)
+    parser.close()
+    return ''.join(parser.parts).strip()
 
 
 # --- Cache discovery ---------------------------------------------------------
@@ -83,13 +111,19 @@ def default_cache_globs() -> list[str]:
     ]
 
 
+def find_caches() -> list[str]:
+    """Return sorted, unique existing Teams cache directories."""
+    return sorted({str(pathlib.Path(hit).resolve())
+                   for pattern in default_cache_globs()
+                   for hit in glob.glob(pattern) if os.path.isdir(hit)})
+
+
 def find_cache() -> Optional[str]:
-    """Return the first Teams v2 LevelDB path found, or None."""
-    for pattern in default_cache_globs():
-        hits = sorted(glob.glob(pattern))
-        if hits:
-            return hits[0]
-    return None
+    """Return the single discovered cache; require explicit choice if ambiguous."""
+    hits = find_caches()
+    if len(hits) > 1:
+        raise ValueError('Multiple Teams cache directories found; pass an explicit leveldb path: ' + ', '.join(hits))
+    return hits[0] if hits else None
 
 
 # --- Model -------------------------------------------------------------------
@@ -174,50 +208,86 @@ class TeamsCacheReader:
         return self._skipped
 
     def _on_bad(self, _key, _raw):  # ccl bad_deserializer_data_handler
-        self._skipped += 1
+        self._skip('deserialization')
         return None
+
+    def _skip(self, reason):
+        self._skipped += 1
+        if not hasattr(self, '_skipped_reasons'):
+            self._skipped_reasons = {}
+        self._skipped_reasons[reason] = self._skipped_reasons.get(reason, 0) + 1
+
+    @property
+    def diagnostics(self) -> dict:
+        """Snapshot of scan diagnostics; missing stores are discovered on access."""
+        return {'skipped': self._skipped,
+                'skipped_reasons': dict(getattr(self, '_skipped_reasons', {})),
+                'stores_found': dict(getattr(self, '_stores_found', {})),
+                'missing_stores': sorted(getattr(self, '_missing_stores', set()))}
 
     def _stores(self, manager: str, store: str):
         """Yield (Account, WrappedObjectStore) for each context of a manager."""
+        if not hasattr(self, '_stores_found'):
+            self._stores_found = {}
+            self._missing_stores = set()
+        key = f'{manager}/{store}'
+        self._stores_found[key] = 0
+        self._missing_stores = {item for item in self._missing_stores
+                                if item != key and not item.startswith(key + ':')}
         for meta in self._db.database_ids:
             name = meta.name or ""
-            if f"Teams:{manager}:" not in name:
+            if not name.startswith(f"Teams:{manager}:"):
                 continue
             parts = name.split(":")
             # …:react-web-client:<tenantId>:<userObjectId>:<locale>
-            try:
-                tenant_id, user_id = parts[-3], parts[-2]
-            except IndexError:
+            if len(parts) != 6 or parts[2] != 'react-web-client' or not all(parts[3:5]):
+                self._skip('unsupported_database_name')
                 continue
+            tenant_id, user_id = parts[-3], parts[-2]
             db = self._db[meta.dbid_no]
             try:
                 obj = db.get_object_store_by_name(store)
             except Exception:
+                self._missing_stores.add(f'{key}:{tenant_id}:{user_id}')
                 continue
+            if obj is None:
+                self._missing_stores.add(f'{key}:{tenant_id}:{user_id}')
+                continue
+            self._stores_found[key] += 1
             yield Account(tenant_id=tenant_id, user_id=user_id), obj
+        if not self._stores_found[key]:
+            self._missing_stores.add(key)
 
     # -- public API --
 
-    def accounts(self) -> list[Account]:
+    def accounts(self, account: Optional[str] = None, *, infer_labels: bool = True) -> list[Account]:
         """List the (tenant, user) contexts that hold messages, labeled by the
         most frequent org/display name seen in their messages."""
         out: list[Account] = []
         for acc, obj in self._stores("replychain-manager", "replychains"):
+            if account and acc.key != account:
+                continue
+            if not infer_labels:
+                out.append(acc)
+                continue
             names: dict[str, int] = {}
             seen = 0
-            for rec in obj.iterate_records(bad_deserializer_data_handler=self._on_bad):
+            for rec in obj.iterate_records(live_only=True, bad_deserializer_data_handler=self._on_bad):
                 if not isinstance(rec.value, dict):
+                    self._skip('invalid_record')
                     continue
-                mm = rec.value.get("messageMap") or {}
+                mm = rec.value.get("messageMap")
                 if isinstance(mm, dict):
                     for msg in mm.values():
                         if not isinstance(msg, dict):
-                            self._skipped += 1
+                            self._skip('invalid_message')
                             continue
                         who = _text(msg.get("imDisplayName"))
                         m = re.search(r"\(([^)]+)\)\s*$", who)  # e.g. "X (GP Rubix)"
                         if m:
                             names[m.group(1)] = names.get(m.group(1), 0) + 1
+                else:
+                    self._skip('invalid_message_map')
                 seen += 1
                 if seen >= 200:  # enough to infer a label cheaply
                     break
@@ -231,19 +301,19 @@ class TeamsCacheReader:
         for acc, obj in self._stores("replychain-manager", "replychains"):
             if account and acc.key != account:
                 continue
-            for rec in obj.iterate_records(bad_deserializer_data_handler=self._on_bad):
+            for rec in obj.iterate_records(live_only=True, bad_deserializer_data_handler=self._on_bad):
                 if not isinstance(rec.value, dict):
+                    self._skip('invalid_record')
                     continue
-                mm = rec.value.get("messageMap") or {}
+                mm = rec.value.get("messageMap")
                 if not isinstance(mm, dict):
+                    self._skip('invalid_message_map')
                     continue
                 for mid, msg in mm.items():
                     if not isinstance(msg, dict):
-                        self._skipped += 1
+                        self._skip('invalid_message')
                         continue
-                    content = _text(msg.get("content"))
-                    if not content:
-                        continue
+                    content = _text(msg.get("content"), msg.get('contentType', ''))
                     yield Message(
                         account=acc.key,
                         conversation_id=str(rec.value.get("conversationId", "")),
@@ -264,8 +334,9 @@ class TeamsCacheReader:
         for acc, obj in self._stores("conversation-manager", "conversations"):
             if account and acc.key != account:
                 continue
-            for rec in obj.iterate_records(bad_deserializer_data_handler=self._on_bad):
+            for rec in obj.iterate_records(live_only=True, bad_deserializer_data_handler=self._on_bad):
                 if not isinstance(rec.value, dict):
+                    self._skip('invalid_record')
                     continue
                 v = rec.value
                 tp = v.get("threadProperties") or {}
@@ -279,7 +350,7 @@ class TeamsCacheReader:
                     "title": _text((tp.get("topic") if isinstance(tp, dict) else "") or ""),
                     "type": str(v.get("type", "")),
                     "last_message_time": str(v.get("lastMessageTimeUtc", "")),
-                    "last_message": _text(last.get("content") if last else ""),
+                    "last_message": _text(last.get("content", ""), last.get('contentType', '')),
                 }
 
     def mentions(self, account: Optional[str] = None) -> Iterator[dict]:
@@ -290,8 +361,9 @@ class TeamsCacheReader:
         for acc, obj in self._stores("messaging-slice-manager", "mentions-metadata-items"):
             if account and acc.key != account:
                 continue
-            for rec in obj.iterate_records(bad_deserializer_data_handler=self._on_bad):
+            for rec in obj.iterate_records(live_only=True, bad_deserializer_data_handler=self._on_bad):
                 if rec.value is None or not isinstance(rec.value, dict):
+                    self._skip('invalid_record')
                     continue
                 v = rec.value
                 yield {
