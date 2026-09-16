@@ -75,7 +75,7 @@ examples/, tools/release.py, .github/workflows/tests.yml, PROVENANCE.json.
   OneNote write with batch deduplication -> acknowledge receipt.
 - [x] Build ZIP from tracked source only; verify hashes; exclude all runtime data.
 - [x] Run Python 3.12 suite and independent review; fix confirmed findings.
-- [ ] Commit, push, and verify remote SHA and CI outcome.
+- [x] Commit, push, and verify remote SHA and CI outcome.
 
 ## Design refinements during implementation
 
@@ -83,3 +83,16 @@ examples/, tools/release.py, .github/workflows/tests.yml, PROVENANCE.json.
 - Two checkpoints separate durable collection from external publication acknowledgement.
 - Dependency-free MCP uses a deliberately limited stdio tools capability set.
 - Implement on a dedicated branch in the clean existing checkout, preserving local main.
+
+## Verification record
+
+- 57 synthetic tests passed locally with Python 3.12 and `-S`.
+- Windows and Ubuntu CI passed at `b5c2053`, including source hash verification
+  and creation of the portable source ZIP (GitHub Actions run 35044700957).
+- The extracted 47-file ZIP passed provenance verification without a Git checkout
+  and its monitor entry point launched successfully.
+- Review fixes cover journal/acknowledgement interleaving, empty-body message edits,
+  reserved path collisions and metadata-only account validation.
+- Implementation is pushed on `codex/incremental-teams-mcp`, PR #1.
+- No real Teams cache, scheduled task registration, or OneNote destination was
+  exercised on the development computer; target-machine acceptance remains.
