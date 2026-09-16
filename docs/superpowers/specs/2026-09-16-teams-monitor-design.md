@@ -11,9 +11,8 @@ changes. Publish through an existing external OneNote MCP using an MCP client.
 - CLI and a stdio MCP tools server call the same service layer.
 - The scheduler collects locally. An external MCP host performs richer synthesis
   and OneNote publishing; two MCP servers do not call each other automatically.
-- Rule extraction creates evidence-linked candidates, not verified bug diagnoses.
-- Optional workflow analysis reports observable participation and cited examples,
-  never an inferred skill score or personality assessment.
+- All knowledge extraction and optional workflow analysis belong to the external
+  agent. The collector supplies normalized messages without rule-based analysis.
 
 ## Correctness
 
@@ -36,7 +35,7 @@ available selected conversation and compares fingerprints: late arrivals and
 edits are detected regardless of original timestamps. Timestamp/message-ID
 watermarks are informational, not the sole ingestion filter.
 
-Before committing state, persist a deterministic batch JSON and Markdown digest
+Before committing state, persist a deterministic message batch JSON
 in an outbox. State records collected messages, run metadata and pending delivery.
 Retrying identical input reuses the batch ID/files. State failure leaves a
 recoverable batch; output failure never advances state. Persisted batch content
@@ -48,7 +47,7 @@ cannot be guaranteed without cooperation from the OneNote destination.
 ## Interfaces
 
 Core modules: reader.py (source), state.py (atomic storage/lock/config), ingest.py
-(monitor state machine), extract.py (candidate insights/workflow observations),
+(monitor state machine),
 service.py (shared operations), cli.py, mcp_server.py, scheduler.py.
 
 Config v1: account, conversation_id, conversation_name, optional leveldb,
@@ -58,13 +57,13 @@ log_path (default logs/monitor.log). No credentials.
 MCP exposes teams_list_accounts, teams_list_conversations,
 teams_resolve_conversation, teams_load_messages, teams_get_mentions,
 teams_bootstrap, teams_ingest, teams_get_checkpoint, teams_list_batches,
-teams_get_batch, teams_ack_batch, teams_analyze_workflow. Startup --config binds
+teams_get_batch, teams_ack_batch. Startup --config binds
 write operations to a monitor. Read results are paginated; bootstrap returns
 counts and a batch ID rather than an unbounded transcript. Batch pages are
 immutable. Host treats message bodies as untrusted data, not instructions.
 
 CLI retains accounts/conversations/search/diagnose and adds messages, mentions,
-serve, and monitor configure/bootstrap/run/status/batches/show/ack/workflow/
+serve, and monitor configure/bootstrap/run/status/batches/show/ack/
 install-task/remove-task. CLI pagination/filtering uses deterministic order.
 
 ## MCP transport

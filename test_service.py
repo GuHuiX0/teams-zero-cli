@@ -89,7 +89,10 @@ class ServiceTests(unittest.TestCase):
     def test_tool_schema_annotations_are_complete(self):
         module = self.service()
         tools = module.TeamsService().tools
-        self.assertEqual(len(tools), 12)
+        self.assertEqual(len(tools), 11)
+        self.assertNotIn('teams_analyze_workflow', [tool['name'] for tool in tools])
+        with self.assertRaisesRegex(ValueError, 'Unknown tool'):
+            module.TeamsService().call('teams_analyze_workflow', {})
         for tool in tools:
             self.assertEqual(tool['inputSchema']['type'], 'object')
             self.assertIs(tool['inputSchema']['additionalProperties'], False)
@@ -141,7 +144,7 @@ class ServiceTests(unittest.TestCase):
                 with self.subTest(extra=extra), self.assertRaises(ValueError):
                     load_config(path)
 
-    def test_bound_writes_batch_ack_checkpoint_and_workflow_use_real_monitor(self):
+    def test_bound_writes_batch_ack_checkpoint_use_real_monitor(self):
         module = self.service()
         with tempfile.TemporaryDirectory() as directory, patch.object(module, 'TeamsCacheReader', FakeSource), \
                 patch('msteams_local_cli.ingest.TeamsCacheReader', FakeSource):
@@ -157,9 +160,6 @@ class ServiceTests(unittest.TestCase):
             self.assertEqual(len(service.call('teams_get_batch', {'batch_id': bid, 'limit': 1})['messages']), 1)
             self.assertEqual(service.call('teams_ack_batch', {'batch_id': bid, 'receipt': 'note:123'})['status'], 'delivered')
             self.assertEqual(service.call('teams_list_batches', {})['total'], 0)
-            workflow = service.call('teams_analyze_workflow', {'limit': 1})
-            self.assertEqual(workflow['total'], 2)
-            self.assertEqual(workflow['people'][0]['sender'], 'Alice')
 
     def test_configure_rejects_unusable_storage_paths_before_creating_config(self):
         module = self.service()

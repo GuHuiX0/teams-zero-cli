@@ -49,13 +49,11 @@ TOOLS = [
     _tool('teams_get_checkpoint', 'Read configured monitor status and collection watermark.'),
     _tool('teams_list_batches', 'List committed monitor batches awaiting external delivery by default.',
           PAGING | {'pending_only': {'type': 'boolean', 'default': True, 'description': 'Only pending batches.'}}),
-    _tool('teams_get_batch', 'Read a committed immutable batch with paginated messages and evidence.',
+    _tool('teams_get_batch', 'Read a committed immutable batch with paginated source messages.',
           PAGING | {'batch_id': _string('Committed batch identifier.')}, ('batch_id',)),
     _tool('teams_ack_batch', 'Mark an explicitly identified batch delivered with an external receipt.',
           {'batch_id': _string('Committed batch identifier.'),
            'receipt': _string('External destination delivery receipt.')}, ('batch_id', 'receipt'), write=True),
-    _tool('teams_analyze_workflow', 'Read evidence-linked participation observations, without skill or personality scoring.',
-          PAGING),
 ]
 
 
@@ -167,9 +165,6 @@ class TeamsService:
             return monitor.get_batch(args['batch_id'], offset, limit)
         if name == 'teams_ack_batch':
             return monitor.ack(args['batch_id'], args['receipt'])
-        result = monitor.workflow()
-        result.update(_named_page(result.pop('people'), 'people', offset, limit))
-        return result
 
 
 def configure_monitor(config_path, conversation=None, conversation_id=None, account=None,
