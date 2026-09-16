@@ -14,6 +14,37 @@ py -3.12 -S teams_cli.py conversations --limit 20
 py -3.12 -S teams_cli.py search "关键词" --limit 20
 ```
 
+## Dev team monitoring
+
+The monitor supports a database-like bootstrap followed by incremental
+collection. First configure one exact group chat, load all messages currently
+available in the local cache, and then schedule fingerprint-based updates:
+
+```powershell
+py -3.12 -S teams_cli.py monitor configure --config monitor.json `
+  --account 'tenantId:userId' --conversation 'Dev Team'
+py -3.12 -S teams_cli.py monitor bootstrap --config monitor.json
+py -3.12 -S teams_cli.py monitor install-task --config monitor.json --interval-minutes 15
+```
+
+Each run writes an immutable JSON/Markdown batch to `digests/`. Edits and late
+arrivals are detected by message ID and content fingerprint. A pending batch is
+not considered delivered until an external destination acknowledges it. Use
+`monitor status`, `monitor batches`, `monitor show`, and `monitor ack` to inspect
+and acknowledge batches.
+
+The repository also provides a dependency-free stdio MCP server:
+
+```powershell
+py -3.12 -S teams_cli.py serve --config monitor.json
+```
+
+It exposes cache reads, bootstrap/incremental ingestion, immutable batch pages,
+mentions, checkpoints, and evidence-linked workflow observations. The MCP host
+can pass those batches to a separate OneNote MCP. This collector never writes
+OneNote directly. See [docs/monitoring.md](docs/monitoring.md) for deployment on
+another Windows computer and the delivery acknowledgement protocol.
+
 如果没有 py 启动器，用 Python 3.12 的完整路径替代。`-S` 禁用 site-packages，可验证无需安装第三方包。
 
 自动发现失败时，指定 IndexedDB 的 `.leveldb` 文件夹：
@@ -30,12 +61,21 @@ py -3.12 -S teams_cli.py search '关键词' --leveldb 'D:\cache-copy\https_teams
 ## 验收与限制
 
 ```powershell
-py -3.12 -S test_cli.py
+py -3.12 -S -m unittest discover -v
+py -3.12 -S tools/release.py --verify
 ```
 
-Windows x64 / CPython 3.12.13 下验证：无 site-packages 导入；真实解析器合成 Snappy、V8、IndexedDB varint、LevelDB 日志样本；合成 Teams 记录映射；CLI 参数位置、过滤、limit、错误退出；临时目录正常与失败清理。未在 Python 3.12.10 本体、真实 Teams 缓存或所有 Teams 版本验证。测试不读取真实用户缓存。
+Python 3.12 下的合成测试覆盖：无 site-packages 导入；Snappy、V8、
+IndexedDB/LevelDB 解析；当前记录与删除标记；HTML 正文；全量初始化、
+增量更新、崩溃恢复与投递确认；MCP stdio；计划任务 XML；源码打包校验。
+测试不读取真实用户缓存，不安装真实计划任务，也不写入 OneNote。
+真实 Teams 版本兼容性和 OneNote MCP 联动需要在目标电脑验收。
 
-这只是 CLI，不提供 MCP 服务。缓存 schema 随 Teams 更新可能变化，遇到不支持记录可跳过或报错。HTML 正文采用上游简单去标签逻辑，部分转义标签字面量可能丢失。大数据库会占用临时磁盘和内存，纯 Python 解码速度有限。
+缓存 schema 随 Teams 更新可能变化，遇到不支持记录可跳过或报错。阅读器
+仍然只读取本地缓存，不承诺完整服务器历史。MCP 服务使用 stdio，stdout
+只输出 JSON-RPC；调试信息输出到 stderr。大数据库会占用临时磁盘和内存，
+纯 Python 解码速度有限。监控、批次和日志目录可能包含私密聊天内容，应
+按本机安全要求保护。
 
 ## 来源
 

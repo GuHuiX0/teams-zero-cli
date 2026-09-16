@@ -614,25 +614,49 @@ class IndexedDb:
         # goodness me this is a slow way of doing things
         prefix = IndexedDb.make_prefix(db_id, store_id, 1)
 
-        for record in self._fetched_records:
-            if record.key.startswith(prefix):
-                key = IdbKey(record.key[len(prefix):])
+        records = self._fetched_records
+        if live_only:
+            # Resolve raw versions before decoding: a corrupt latest value must
+            # never cause an older version to be revived.
+            latest = {}
+            for record in records:
+                user_key = record.user_key
+                if user_key.startswith(prefix):
+                    previous = latest.get(user_key)
+                    if previous is None or record.seq > previous.seq:
+                        latest[user_key] = record
+            records = (record for record in latest.values()
+                       if record.state == ccl_leveldb.KeyState.Live)
+
+        for record in records:
+            raw_key = record.user_key if live_only else record.key
+            if raw_key.startswith(prefix):
+                try:
+                    key = IdbKey(raw_key[len(prefix):])
+                except Exception:
+                    if bad_deserializer_data_handler is not None:
+                        bad_deserializer_data_handler(raw_key, record.value)
+                        continue
+                    raise
                 if not record.value:
+                    if live_only:
+                        if bad_deserializer_data_handler is not None:
+                            bad_deserializer_data_handler(key, record.value)
+                            continue
+                        raise ValueError('Empty value for a live IndexedDB record')
                     # empty values will obviously fail, returning None is probably better than dying.
                     yield IndexedDbRecord(self, db_id, store_id, key, None,
                                           record.state == ccl_leveldb.KeyState.Live, record.seq, record.origin_file)
                     continue
-                value_version, varint_raw = _le_varint_from_bytes(record.value)
-                val_idx = len(varint_raw)
-                # read the blink envelope
-                precursor = self.read_record_precursor(
-                    key, db_id, store_id, record.value[val_idx:], bad_deserializer_data_handler)
-                if precursor is None:
-                    continue  # only returns None on error, handled in the function if bad_deserializer_data_handler can
-
-                blink_version, obj_raw, trailer, external_path = precursor
-
                 try:
+                    value_version, varint_raw = _le_varint_from_bytes(record.value)
+                    val_idx = len(varint_raw)
+                    # read the blink envelope
+                    precursor = self.read_record_precursor(
+                        key, db_id, store_id, record.value[val_idx:], bad_deserializer_data_handler)
+                    if precursor is None:
+                        continue
+                    blink_version, obj_raw, trailer, external_path = precursor
                     deserializer = ccl_v8_value_deserializer.Deserializer(
                         obj_raw, host_object_delegate=blink_deserializer.read)
                     value = deserializer.read()

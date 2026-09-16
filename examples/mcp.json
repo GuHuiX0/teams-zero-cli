@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "teams-cache": {
+      "command": "C:\\Python312\\python.exe",
+      "args": [
+        "-S",
+        "C:\\Tools\\teams-zero-cli\\teams_cli.py",
+        "serve",
+        "--config",
+        "C:\\Tools\\teams-zero-cli\\monitor.json"
+      ]
+    }
+  }
+}
