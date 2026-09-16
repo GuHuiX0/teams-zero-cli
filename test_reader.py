@@ -95,7 +95,9 @@ class ReaderCorrectness(unittest.TestCase):
             (base / 'a').mkdir()
             (base / 'file').write_text('not a cache')
             with patch.object(reader, 'default_cache_globs', return_value=[str(base / '*'), str(base / 'a')]):
-                self.assertEqual(reader.find_caches(), [str(base / 'a'), str(base / 'b')])
+                # Windows CI may supply an 8.3 alias in the temp directory.
+                self.assertEqual(reader.find_caches(),
+                                 [str((base / 'a').resolve()), str((base / 'b').resolve())])
                 with self.assertRaisesRegex(ValueError, 'ambiguous|multiple|Multiple'):
                     reader.find_cache()
 
