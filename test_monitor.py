@@ -146,19 +146,31 @@ class MonitorTests(unittest.TestCase):
         with StateLock(path):
             pass
 
-    def test_rules_and_workflow_are_cited_observations(self):
+    def test_batches_preserve_messages_without_generated_analysis(self):
         SyntheticReader.rows = [message('a', 'Bug: `Parser` crashes. I will investigate.'),
                                 message('b', '决定使用 SQLite；待办：修复解析错误')]
         bid = self.monitor.collect('bootstrap')['batch_id']
         batch = self.monitor.get_batch(bid)
-        self.assertTrue(batch['insights'])
-        for insight in batch['insights']:
-            self.assertIn(insight['category'], ['bug', 'issue', 'term', 'decision', 'action', 'question'])
-            self.assertTrue(insight['evidence'])
-            self.assertEqual(insight['evidence'][0]['conversation_id'], 'chat')
-        people = self.monitor.workflow()['people']
-        self.assertEqual(people[0]['sender'], 'Alice')
-        self.assertEqual(people[0]['message_count'], 2)
+        self.assertEqual([m['content'] for m in batch['messages']],
+                         [m.content for m in SyntheticReader.rows])
+        self.assertNotIn('insights', batch)
+        saved = json.loads((self.root / 'digests' / (bid + '.json')).read_text(encoding='utf-8'))
+        self.assertNotIn('insights', saved)
+        self.assertEqual(list((self.root / 'digests').glob('*.md')), [])
+
+    def test_legacy_batch_still_reads_and_acknowledges_without_analysis(self):
+        SyntheticReader.rows = [message('a')]
+        bid = self.monitor.collect('bootstrap')['batch_id']
+        path = self.root / 'digests' / (bid + '.json')
+        saved = json.loads(path.read_text(encoding='utf-8'))
+        saved['insights'] = [{'category': 'bug', 'evidence': [{'message_id': 'a'}]}]
+        path.write_text(json.dumps(saved), encoding='utf-8')
+        original = path.read_bytes()
+        batch = self.monitor.get_batch(bid)
+        self.assertNotIn('insights', batch)
+        self.assertEqual(batch['messages'][0]['message_id'], 'a')
+        self.monitor.ack(bid, 'note:legacy')
+        self.assertEqual(path.read_bytes(), original)
 
     def test_unrelated_accounts_do_not_require_deserializing_their_messages(self):
         class Source(SyntheticReader):

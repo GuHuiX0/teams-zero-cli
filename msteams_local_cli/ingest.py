@@ -6,7 +6,6 @@ import json
 from pathlib import Path
 import re
 
-from . import extract
 from .reader import TeamsCacheReader
 from .state import StateLock, atomic_write, load_config, read_json, save_state
 
@@ -64,9 +63,6 @@ def write_batch(output_path, batch):
         batch = saved
     else:
         atomic_write(path, json.dumps(batch, ensure_ascii=False, indent=2) + '\n')
-    md = output / (batch['batch_id'] + '.md')
-    if not md.exists():
-        atomic_write(md, extract.markdown(batch))
     return batch
 
 
@@ -160,7 +156,7 @@ class Monitor:
                 batch = {'version': 1, 'batch_id': batch_id, 'created_at': now(),
                          'account': state['account'], 'conversation_id': state['conversation_id'],
                          'conversation_name': self.config.get('conversation_name', state['conversation_id']),
-                         'mode': effective_mode, 'messages': changes, 'insights': extract.extract(changes)}
+                         'mode': effective_mode, 'messages': changes}
                 state['generation'] += 1
                 state['batches'][batch_id] = {'status': 'pending', 'created_at': batch['created_at'],
                                              'message_count': len(changes), 'receipt': None}
@@ -204,15 +200,9 @@ class Monitor:
         batch = read_json(Path(self.config['output_path']) / (batch_id + '.json'))
         result = page(batch['messages'], offset, limit)
         rows = result.pop('items')
-        ids = {m['message_id'] for m in rows}
-        # Paginate evidence as well as messages, avoiding bootstrap-sized MCP payloads.
-        insights = []
-        for item in batch['insights']:
-            refs = [e for e in item['evidence'] if e['message_id'] in ids]
-            if refs:
-                insights.append(item | {'evidence': refs})
+        # Older immutable batches may contain analysis; expose only source data.
         return {k: v for k, v in batch.items() if k not in ('messages', 'insights')} | result | {
-            'messages': rows, 'insights': insights}
+            'messages': rows}
 
     def ack(self, batch_id, receipt):
         if not isinstance(receipt, str) or not receipt.strip():
@@ -231,7 +221,3 @@ class Monitor:
                 delivery.update(status='delivered', receipt=receipt, delivered_at=now())
                 save_state(self.state_path, state)
             return {'batch_id': batch_id, **delivery}
-
-    def workflow(self):
-        rows = [v['message'] for v in self._load()['messages'].values()]
-        return extract.workflow(sorted(rows, key=message_order))

@@ -15,7 +15,7 @@
 - No mandatory installed third-party packages. Validate with python -S.
 - Do not read real Teams caches or schedule a task on this development machine.
 - Commit and push completed implementation to GuHuiX0/teams-zero-cli.
-- All published insights carry account/conversation/message evidence identifiers.
+- All collected messages retain account/conversation/message identifiers for external analysis.
 - Cache disappearance is not proof of message deletion.
 
 ## Task 1: Reader correctness
@@ -29,11 +29,11 @@ add find_caches() -> list[str], diagnostics property. Existing Message fields st
 - [x] Resolve current raw records before decoding and use live_only=True throughout reader.
 - [x] Add clear discovery/schema diagnostics; run reader and existing tests.
 
-## Task 2: Durable ingestion and extraction
+## Task 2: Durable ingestion
 
-Files: state.py, ingest.py, extract.py, service.py, test_monitor.py.
+Files: state.py, ingest.py, service.py, test_monitor.py.
 Interface: Monitor(config_path).collect(mode), status(), list_batches(),
-get_batch(batch_id, offset=0, limit=100), ack(batch_id, receipt), workflow().
+get_batch(batch_id, offset=0, limit=100), ack(batch_id, receipt).
 TeamsService(config_path=None).call(name, arguments) -> dict; TOOLS list of MCP tool definitions.
 
 - [x] Test bootstrap >50 messages, no-op retry, late arrivals, edited messages,
@@ -41,7 +41,8 @@ TeamsService(config_path=None).call(name, arguments) -> dict; TOOLS list of MCP 
 - [x] Run `python -S -m unittest test_monitor -v` to confirm missing behaviors.
 - [x] Implement atomic JSON replacement, OS lock, config-relative paths, schema validation.
 - [x] Implement deterministic fingerprint-based batches and separate delivery receipts.
-- [x] Extract conservative bilingual category candidates, terms and cited workflow counts.
+- [x] Per subsequent user request, remove rule-based extraction, Markdown digests,
+  and workflow analysis. Preserve message batches and leave analysis to an external agent.
 - [x] Verify all ingestion tests and shared service filtering/pagination.
 
 ## Task 3: MCP transport

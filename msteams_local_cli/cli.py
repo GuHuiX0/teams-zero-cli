@@ -52,7 +52,7 @@ def make_parser():
     monitor = sub.add_parser('monitor', parents=[config_parent])
     operations = monitor.add_subparsers(dest='operation', required=True)
     for name in ('configure', 'bootstrap', 'run', 'status', 'batches', 'show', 'ack',
-                 'workflow', 'install-task', 'remove-task'):
+                 'install-task', 'remove-task'):
         command = operations.add_parser(name, parents=[config_parent, common])
         if name == 'configure':
             selection = command.add_mutually_exclusive_group(required=True)
@@ -62,7 +62,7 @@ def make_parser():
             command.add_argument('--output-dir', default='digests')
         if name == 'run':
             command.add_argument('--scheduled', action='store_true', help='Write rotating operational logs')
-        if name in ('batches', 'show', 'workflow'):
+        if name in ('batches', 'show'):
             command.add_argument('--offset', type=int, default=0)
         if name == 'batches':
             command.add_argument('--all', action='store_true', help='Include delivered batches')
@@ -104,10 +104,9 @@ def monitor_command(args):
     service = TeamsService(config)
     tool = {'bootstrap': 'teams_bootstrap', 'run': 'teams_ingest',
             'status': 'teams_get_checkpoint', 'batches': 'teams_list_batches',
-            'show': 'teams_get_batch', 'ack': 'teams_ack_batch',
-            'workflow': 'teams_analyze_workflow'}[operation]
+            'show': 'teams_get_batch', 'ack': 'teams_ack_batch'}[operation]
     arguments = {}
-    if operation in ('batches', 'show', 'workflow'):
+    if operation in ('batches', 'show'):
         arguments.update(offset=args.offset, limit=getattr(args, 'limit', 100))
     if operation == 'batches':
         arguments['pending_only'] = not args.all

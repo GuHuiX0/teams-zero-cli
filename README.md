@@ -27,7 +27,7 @@ py -3.12 -S teams_cli.py monitor bootstrap --config monitor.json
 py -3.12 -S teams_cli.py monitor install-task --config monitor.json --interval-minutes 15
 ```
 
-Each run writes an immutable JSON/Markdown batch to `digests/`. Edits and late
+Each run with changes writes an immutable JSON message batch to `digests/`. Edits and late
 arrivals are detected by message ID and content fingerprint. A pending batch is
 not considered delivered until an external destination acknowledges it. Use
 `monitor status`, `monitor batches`, `monitor show`, and `monitor ack` to inspect
@@ -40,8 +40,10 @@ py -3.12 -S teams_cli.py serve --config monitor.json
 ```
 
 It exposes cache reads, bootstrap/incremental ingestion, immutable batch pages,
-mentions, checkpoints, and evidence-linked workflow observations. The MCP host
-can pass those batches to a separate OneNote MCP. This collector never writes
+mentions, and checkpoints. All knowledge extraction and workflow analysis are
+performed by your external agent using the source messages; no keyword rules or
+generated insights are included. The MCP host can publish the agent's findings
+through a separate OneNote MCP. This collector never writes
 OneNote directly. See [docs/monitoring.md](docs/monitoring.md) for deployment on
 another Windows computer and the delivery acknowledgement protocol.
 
